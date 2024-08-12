@@ -1,0 +1,27 @@
+/target
+
+data/*
+.env 
+
+# Ignore compiled output and build directories
+/out/
+/bin/
+/build/
+
+# Ignore dependencies
+/node_modules/
+/bower_components/
+
+# Ignore logs and temporary files
+*.log
+*.tmp
+
+# Ignore IDE and editor specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Ignore operating system files
+.DS_Store
+Thumbs.db
