@@ -6,17 +6,22 @@ use axum::{
 
 use crate::AppState;
 use crate::logic::form::{
-    get_form_by_id,
-    get_forms,
-    create_new_form,
-    update_form,
-    remove_form
+    get_all_forms_handler,
+    get_form_via_id_handler,
+    insert_form_handler,
+    update_form_handler,
+    delete_form_handler
 };
 
 // Creates all the routes
 pub fn init_form_routes(state: Arc<AppState>) -> Router {
     return Router::new()
-        .route("/:id", get(get_form_by_id).put(update_form).delete(remove_form))
-        .route("/", get(get_forms).post(create_new_form))
+        .route("/:id", 
+            get(get_form_via_id_handler)
+            .put(update_form_handler)
+            .delete(delete_form_handler))
+        .route("/", 
+            get(get_all_forms_handler)
+            .post(insert_form_handler))
         .with_state(state);
 }
