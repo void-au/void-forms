@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use axum::extract::{Path, Json};
-use std::convert::Infallible;
 use serde_json::{Value, json};
 use axum::extract::State;
 use crate::AppState;
@@ -62,23 +61,15 @@ pub async fn get_forms(State(state): State<Arc<AppState>>) -> Json<Value>{
 }
 
 pub async fn get_form_by_id(Path(form_id): Path<String>) -> Json<Value> {
-    let client = crate::db::connect().await.unwrap();
     let form_id: Uuid = form_id.parse().unwrap(); // Convert String to Uuid
-    let query = "SELECT * FROM forms WHERE id = $1";
-    let row = client.query_one(query, &[&form_id]).await.unwrap();
-
-    let id: Uuid = row.get(0);
-    let first_name: String = row.get(1);
-    let last_name: String = row.get(2);
-    let email: String = row.get(3);
-    let message: String = row.get(4);
+    let form = get_form(form_id).await;
 
     Json(json!({
-        "id": id.to_string(), // Convert Uuid to String
-        "first_name": first_name,
-        "last_name": last_name,
-        "email": email,
-        "message": message,
+        "id": form.id.to_string(), // Convert Uuid to String
+        "first_name": form.first_name,
+        "last_name": form.last_name,
+        "email": form.email,
+        "message": form.message,
         // "additional_data": null,
     }))
 }
@@ -97,5 +88,54 @@ pub async fn create_new_form(State(state): State<Arc<AppState>>, Json(form): Jso
         "email": form.email,
         "message": form.message,
         // "additional_data": null,
+    }))
+}
+
+
+pub async fn update_form(State(state): State<Arc<AppState>>, Path(form_id): Path<String>, Json(update_form): Json<CreateForm>) -> Json<Value> {
+    let client = state.db_client.clone();
+
+    // Get the old form
+    let form_id: Uuid = form_id.parse().unwrap(); // Convert String to Uuid
+    let form = get_form(form_id).await;
+
+    // Update the form
+    let query = "UPDATE forms SET first_name = $1, last_name = $2, email = $3, message = $4 WHERE id = $5";
+    client.execute(query, &[&update_form.first_name, &update_form.last_name, &update_form.email, &update_form.message, &form.id]).await.unwrap();
+
+    Json(json!({
+        "first_name": form.first_name,
+        "last_name": form.last_name,
+        "email": form.email,
+        "message": form.message,
+        // "additional_data": null,
+    }))
+}
+
+
+async fn get_form(form_id: Uuid) -> Form {
+    let client = crate::db::connect().await.unwrap();
+    let query = "SELECT * FROM forms WHERE id = $1";
+    let row = client.query_one(query, &[&form_id]).await.unwrap();
+
+    let id: Uuid = row.get(0);
+    let first_name: String = row.get(1);
+    let last_name: String = row.get(2);
+    let email: String = row.get(3);
+    let message: String = row.get(4);
+
+    Form::new(id, first_name, last_name, email, message, None)
+}
+
+
+pub async fn remove_form(Path(form_id): Path<String>) -> Json<Value> {
+    let form_id: Uuid = form_id.parse().unwrap(); // Convert String to Uuid
+    let client = crate::db::connect().await.unwrap();
+
+    let query = "DELETE FROM forms WHERE id = $1";
+    client.execute(query, &[&form_id]).await.unwrap();
+
+    Json(json!({
+        "message": "Form deleted successfully",
     }))
 }

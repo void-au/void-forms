@@ -5,11 +5,6 @@ mod logic;
 use dotenv::dotenv;
 use std::env;
 use std::sync::Arc;
-use axum::{
-    extract::State,
-    routing::get,
-    Router,
-};
 
 use crate::routes::init_routes;
 
