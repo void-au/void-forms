@@ -5,6 +5,7 @@ mod logic;
 use dotenv::dotenv;
 use std::env;
 use std::sync::Arc;
+use std::panic;
 
 use crate::routes::init_routes;
 
@@ -16,6 +17,11 @@ struct AppState {
 #[tokio::main]
 async fn main() {
     dotenv().ok();
+
+     // Set up global panic hook to handle panics and return 500 responses
+    panic::set_hook(Box::new(|panic_info| {
+        eprintln!("Unhandled panic: {:?}", panic_info);
+    }));
 
     // Load the database client
     let db_client = db::connect().await.unwrap();

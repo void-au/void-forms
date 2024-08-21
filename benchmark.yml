@@ -1,0 +1,9 @@
+concurrency: 12
+base: 'http://localhost:8000'
+iterations: 100
+rampup: 2
+
+plan:
+  - name: Fetch forms
+    request:
+      url: /forms

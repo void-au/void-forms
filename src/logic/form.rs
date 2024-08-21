@@ -11,7 +11,7 @@ pub struct CreateForm {
     first_name: String,
     last_name: String,
     email: String,
-    message: String,
+    message: String,    
     additional_data: Option<serde_json::Value>,
 }
 
@@ -20,7 +20,8 @@ pub struct UpdateForm {
     first_name: Option<String>,
     last_name: Option<String>,
     email: Option<String>,
-    message: Option<String>,    
+    message: Option<String>,
+    additional_data: Option<serde_json::Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -45,48 +46,39 @@ impl Form {
         }
     }
 
-    pub async fn get_all(client: &tokio_postgres::Client) -> Result<Vec<Form>, tokio_postgres::Error> {
-        let query = "SELECT * FROM forms";
-        let rows = client.query(query, &[]).await?;
+    pub fn extract_form(row: tokio_postgres::Row) -> Form {
+        let id: Uuid = row.get("id");
+        let first_name: String = row.get("first_name");
+        let last_name: String = row.get("last_name");
+        let email: String = row.get("email");
+        let message: String = row.get("message");
+        let additional_data: Option<serde_json::Value> = row.get("additional_data");
 
+        Form::new(id, first_name, last_name, email, message, additional_data)
+    }
+
+    pub async fn get_all(client: &tokio_postgres::Client) -> Result<Vec<Form>, tokio_postgres::Error> {
+        let query = "SELECT id, first_name, last_name, email, message, additional_data FROM form";
+        let rows = client.query(query, &[]).await?;
         let mut forms = Vec::new();
 
         for row in rows {
-            let id: Uuid = row.get(0);
-            let first_name: String = row.get(1);
-            let last_name: String = row.get(2);
-            let email: String = row.get(3);
-            let message: String = row.get(4);
-            let additional_data: Option<serde_json::Value> = row.get(5);
-
-            forms.push(Form::new(id, first_name, last_name, email, message, additional_data));
+            forms.push(Form::extract_form(row));
         }
 
         Ok(forms)
     }
 
     pub async fn get_by_id(client: &tokio_postgres::Client, id: Uuid) -> Result<Form, tokio_postgres::Error> {
-        let query = "SELECT * FROM forms WHERE id = $1";
+        let query = "SELECT id, first_name, last_name, email, message, additional_data FROM form WHERE id = $1";
         let row = client.query_one(query, &[&id]).await?;
-
-        let id: Uuid = row.get(0);
-        let first_name: String = row.get(1);
-        let last_name: String = row.get(2);
-        let email: String = row.get(3);
-        let message: String = row.get(4);
-        let additional_data: Option<serde_json::Value> = row.get(5);
-
-        Ok(Form::new(id, first_name, last_name, email, message, additional_data))
+        Ok(Form::extract_form(row))
     }
 
     pub async fn insert(client: &tokio_postgres::Client, form: CreateForm) -> Result<Form, tokio_postgres::Error> {
-        // Ensure that the additional_data is not too big 
-        // TODO: Extract this from some sort of configuration setting
-        // TODO: Return an http error of some sort? -> How to handle this in rust?
         if let Some(additional_data) = &form.additional_data {
-            println!("Additional data: {}", additional_data.to_string().len());
             if additional_data.to_string().len() > 1000 {
-                // Panic if the additional_data is too big
+                // TODO: Convert this to a http exception
                 panic!("additional_data is too big");
             }
         }
@@ -98,13 +90,13 @@ impl Form {
     }
 
     pub async fn update(client: &tokio_postgres::Client, id: Uuid, form: Form) -> Result<Form, tokio_postgres::Error> {
-        let query = "UPDATE forms SET first_name = $1, last_name = $2, email = $3, message = $4 WHERE id = $5";
-        client.execute(query, &[&form.first_name, &form.last_name, &form.email, &form.message, &id]).await.unwrap();
+        let query = "UPDATE forms SET first_name = $1, last_name = $2, email = $3, message = $4,  additional_data = $5 WHERE id = $6";
+        client.execute(query, &[&form.first_name, &form.last_name, &form.email, &form.message, &form.additional_data, &id]).await.unwrap();
         Form::get_by_id(client, id).await
     }
 
     pub async fn delete(client: &tokio_postgres::Client, id: Uuid) -> Result<(), tokio_postgres::Error> {
-        let query = "DELETE FROM forms WHERE id = $1";
+        let query = "DELETE FROM form WHERE id = $1";
         client.execute(query, &[&id]).await?;
         Ok(())
     }
@@ -143,7 +135,7 @@ pub async fn update_form_handler(State(state): State<Arc<AppState>>, Path(form_i
             update_form.last_name.clone().unwrap_or(form.last_name),
             update_form.email.clone().unwrap_or(form.email),
             update_form.message.clone().unwrap_or(form.message),
-            form.additional_data, // Keep the existing additional_data, or handle it accordingly
+            update_form.additional_data.clone().or(form.additional_data.clone()), // Use original if None
         );
 
         Json(json!(Form::update(&client, form_id, merged_form).await.unwrap()))
