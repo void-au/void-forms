@@ -13,7 +13,7 @@ use crate::logic::user::{
     delete_user_handler
 };
 
-pub fn init_user_routes(state: Arc<AppState>) -> Router {
+pub fn init_routes(state: Arc<AppState>) -> Router {
     return Router::new()
         .route("/:id", 
             get(get_user_via_id_handler)

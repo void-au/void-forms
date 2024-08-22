@@ -44,6 +44,13 @@ pub struct UpdateUser {
     pub last_name: Option<String>,
 }
 
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LoginUser {
+    pub email: String,
+    pub password: String,
+}
+
 impl FullUser {
     pub fn new(id: Uuid, email: String, first_name: String, last_name: String, created_at: DateTime<Utc>, updated_at: DateTime<Utc>, password: String) -> Self {
         FullUser {
@@ -74,6 +81,23 @@ impl FullUser {
         let row = client.query_one(query, &[&id]).await?;
         Ok(FullUser::extract_user(row))
     }
+
+    pub async fn get_by_email(client: &tokio_postgres::Client, email: String) -> Result<FullUser, tokio_postgres::Error> {
+        let query = "SELECT id, email, first_name, last_name, created_at, updated_at, password FROM user_account WHERE email = $1";
+        let row = client.query_one(query, &[&email]).await?;
+        Ok(FullUser::extract_user(row))
+    }
+
+    pub fn to_user(&self) -> User {
+        User {
+            id: self.id,
+            email: self.email.clone(),
+            first_name: self.first_name.clone(),
+            last_name: self.last_name.clone(),
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+        }
+    }
 }
 
 
@@ -86,6 +110,16 @@ impl User {
             last_name,
             created_at,
             updated_at,
+        }
+    }
+
+    pub async fn login(client: &tokio_postgres::Client, email: String, password: String) -> Result<User, tokio_postgres::Error> {
+        let full_user = FullUser::get_by_email(client, email).await.unwrap();
+
+        if bcrypt::verify(password, &full_user.password).unwrap() {
+            Ok(FullUser::to_user(&full_user))
+        } else {
+            panic!("Invalid password");
         }
     }
 
@@ -103,7 +137,7 @@ impl User {
 
     pub async fn email_exists(client: &tokio_postgres::Client, email: String) -> Result<bool, tokio_postgres::Error> {
         // Check if the email account exists in user_account and deactivated_user
-        let query = "SELECT EXISTS(SELECT 1 FROM user_account WHERE email = $1) OR EXISTS(SELECT 1 FROM deleted_users WHERE email = $1)";
+        let query = "SELECT EXISTS(SELECT 1 FROM user_account WHERE email = $1) OR EXISTS(SELECT 1 FROM deactivated_user WHERE email = $1)";
         let row = client.query_one(query, &[&email]).await?;
         Ok(row.get(0))
     }
@@ -129,9 +163,9 @@ impl User {
 
 
     pub async fn create(client: &tokio_postgres::Client, user: CreateUser) -> Result<User, tokio_postgres::Error> {
-        // Check if the user already exists
+        // Check if the email already exists -> use match
         if User::email_exists(client, user.email.clone()).await.unwrap() {
-            panic!("User already exists");
+            panic!("Email already exists");
         }
 
         let password = bcrypt::hash(user.password, 12).unwrap();
@@ -160,6 +194,21 @@ impl User {
         client.execute(query, &[&id]).await?;
         Ok(())
     }
+}
+
+
+// Handler for login a user
+pub async fn login_user_handler(State(state): State<Arc<AppState>>, Json(login): Json<LoginUser>) -> Json<Value>{
+    let client = state.db_client.clone();
+
+    // Login the user
+    let user = User::login(&client, login.email.clone(), login.password.clone()).await.unwrap();
+
+    // Sign JWT
+    // let token = jwt::sign(user.id, user.email.clone());
+
+    // Return the user and token
+    Json(json!(user))
 }
 
 
