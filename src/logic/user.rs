@@ -1,12 +1,21 @@
 use serde::{Deserialize, Serialize};
-use axum::extract::{Path, Json};
+use axum::{
+    body::Body,
+    response::IntoResponse,
+    extract::{Request, Json, State, Path},
+    http,
+    http::{Response, StatusCode},
+    middleware::Next
+};
 use serde_json::{Value, json};
-use axum::extract::State;
 use crate::AppState;
 use std::sync::Arc;
 use uuid::Uuid;
 use bcrypt;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, Duration};
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, TokenData, Validation};
+use rand;
+
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct User {
@@ -49,6 +58,13 @@ pub struct UpdateUser {
 pub struct LoginUser {
     pub email: String,
     pub password: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Claims {
+    sub: String,
+    iat: usize,
+    exp: usize,
 }
 
 impl FullUser {
@@ -111,6 +127,41 @@ impl User {
             created_at,
             updated_at,
         }
+    }
+
+    // Encode a JWT token
+    pub fn encode_token(user: &User, hours: i64) -> Result<String, StatusCode> {
+        let secret = "secret";
+        let now = Utc::now();
+        let expire = Duration::hours(hours);
+        let exp: usize = (now + expire).timestamp() as usize;
+        let iat: usize = now.timestamp() as usize;
+
+        let claim = Claims {
+            sub: user.id.to_string(),
+            iat,
+            exp,
+        };
+
+        encode(&Header::default(), &claim, &EncodingKey::from_secret(secret.as_ref()))
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+    }
+
+
+    // Decode a JWT token
+    pub fn decode_token(client: &tokio_postgres::Client, token: String) {
+        let secret = "secret";
+        let result: Result<TokenData<Claims>, StatusCode> = decode(
+            &token,
+            &DecodingKey::from_secret(secret.as_ref()),
+            &Validation::default(),
+        )
+        .map_err(|_| StatusCode::UNAUTHORIZED);
+
+        // Covnert sub to Uuid
+        let user_id = Uuid::parse_str(&result.unwrap().claims.sub).unwrap();
+
+        User::get_by_id(client, user_id);
     }
 
     pub async fn login(client: &tokio_postgres::Client, email: String, password: String) -> Result<User, tokio_postgres::Error> {
@@ -201,14 +252,19 @@ impl User {
 pub async fn login_user_handler(State(state): State<Arc<AppState>>, Json(login): Json<LoginUser>) -> Json<Value>{
     let client = state.db_client.clone();
 
+    // Create a fake random 1-4 second delay to prevent timing attacks
+    let delay = rand::random::<u64>() % 4;
+    tokio::time::sleep(tokio::time::Duration::from_secs(delay)).await;
+
     // Login the user
     let user = User::login(&client, login.email.clone(), login.password.clone()).await.unwrap();
 
     // Sign JWT
-    // let token = jwt::sign(user.id, user.email.clone());
+    let auth_token = User::encode_token(&user, 24).unwrap();
+    let reset_token = User::encode_token(&user, 720).unwrap();
 
     // Return the user and token
-    Json(json!(user))
+    Json(json!({"user": user, "auth_token": auth_token, "reset_token": reset_token}))
 }
 
 
@@ -253,3 +309,4 @@ pub async fn delete_user_handler(Path(id): Path<Uuid>, State(state): State<Arc<A
     User::delete(&client, id).await.unwrap();
     Json(json!({"message": "User deleted"}))
 }
+
