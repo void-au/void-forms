@@ -37,7 +37,6 @@ pub struct FullUser {
     pub password: String,
 }
 
-
 #[derive(Deserialize, Debug)]
 pub struct CreateUser {
     pub email: String,
