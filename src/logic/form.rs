@@ -31,7 +31,7 @@ pub struct Form {
     pub last_name: String,
     pub email: String,
     pub message: String,
-    pub additional_data: Option<serde_json::Value>,
+    pub additional_data: Option<serde_json::Value>
 }
 
 impl Form {

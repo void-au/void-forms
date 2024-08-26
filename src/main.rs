@@ -1,6 +1,7 @@
 mod db;
 mod routes;
 mod logic;
+mod mw;
 
 use dotenv::dotenv;
 use std::env;

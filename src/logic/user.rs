@@ -1,11 +1,8 @@
 use serde::{Deserialize, Serialize};
 use axum::{
-    body::Body,
-    response::IntoResponse,
-    extract::{Request, Json, State, Path},
-    http,
-    http::{Response, StatusCode},
-    middleware::Next
+    extract::{Json, State, Path},
+    http::{StatusCode},
+    Extension
 };
 use serde_json::{Value, json};
 use crate::AppState;
@@ -59,11 +56,16 @@ pub struct LoginUser {
     pub password: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-struct Claims {
-    sub: String,
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Claims {
+    pub sub: String,
     iat: usize,
     exp: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct AuthenticatedUser {
+    pub user_id: String,
 }
 
 impl FullUser {
@@ -148,7 +150,7 @@ impl User {
 
 
     // Decode a JWT token
-    pub fn decode_token(client: &tokio_postgres::Client, token: String) {
+    pub fn decode_token(token: String) -> Claims {
         let secret = "secret";
         let result: Result<TokenData<Claims>, StatusCode> = decode(
             &token,
@@ -157,10 +159,8 @@ impl User {
         )
         .map_err(|_| StatusCode::UNAUTHORIZED);
 
-        // Covnert sub to Uuid
-        let user_id = Uuid::parse_str(&result.unwrap().claims.sub).unwrap();
-
-        User::get_by_id(client, user_id);
+        // Return the result Claims or panic
+        result.unwrap().claims
     }
 
     pub async fn login(client: &tokio_postgres::Client, email: String, password: String) -> Result<User, tokio_postgres::Error> {
@@ -268,29 +268,29 @@ pub async fn login_user_handler(State(state): State<Arc<AppState>>, Json(login):
 
 
 // Gets all the users
-pub async fn get_all_users_handler(State(state): State<Arc<AppState>>) -> Json<Value>{
-    let client = state.db_client.clone();
-    Json(json!(User::get_all(&client).await.unwrap()))
-}
+// pub async fn get_all_users_handler(State(state): State<Arc<AppState>>) -> Json<Value>{
+//     let client = state.db_client.clone();
+//     Json(json!(User::get_all(&client).await.unwrap()))
+// }
 
-// Gets a user by id
-pub async fn get_user_via_id_handler(Path(id): Path<Uuid>, State(state): State<Arc<AppState>>) -> Json<Value>{
-    println!("Got the id: {}", &id.to_string());
+// Gets a user by id -> Only returns the authed users info...
+pub async fn get_user_via_id_handler(Path(id): Path<Uuid>, State(state): State<Arc<AppState>>, Extension(authed_user): Extension<AuthenticatedUser>) -> Json<Value>{
+    let user_id = Uuid::parse_str(&authed_user.user_id).unwrap();
     let client = state.db_client.clone();
-    Json(json!(User::get_by_id(&client, id).await.unwrap()))
+    Json(json!(User::get_by_id(&client, user_id).await.unwrap()))
 }
 
 // Inserts a user
-pub async fn insert_user_handler(State(state): State<Arc<AppState>>, Json(user): Json<CreateUser>) -> Json<Value>{
-    let client = state.db_client.clone();
-    Json(json!(User::create(&client, user).await.unwrap()))
-}
+// pub async fn insert_user_handler(State(state): State<Arc<AppState>>, Json(user): Json<CreateUser>) -> Json<Value>{
+//     let client = state.db_client.clone();
+//     Json(json!(User::create(&client, user).await.unwrap()))
+// }
 
 // Updates a user
-pub async fn update_user_handler(State(state): State<Arc<AppState>>, Path(id): Path<Uuid>, Json(update_user): Json<UpdateUser>) -> Json<Value>{
+pub async fn update_user_handler(Path(id): Path<Uuid>, State(state): State<Arc<AppState>>, Extension(authed_user): Extension<AuthenticatedUser>, Json(update_user): Json<UpdateUser>) -> Json<Value>{
     let client = state.db_client.clone();
-    let user = User::get_by_id(&client, id).await.unwrap();
-    println!("User: {:?}", user);    
+    let user_id = Uuid::parse_str(&authed_user.user_id).unwrap();
+    let user = User::get_by_id(&client, user_id).await.unwrap();
     
     // Setup the new user with the optional fields
     let merged_user = UpdateUser {
@@ -299,13 +299,14 @@ pub async fn update_user_handler(State(state): State<Arc<AppState>>, Path(id): P
         last_name: update_user.last_name.or(Some(user.last_name)),
     };
 
-    Json(json!(User::update(&client, id, merged_user).await.unwrap()))
+    Json(json!(User::update(&client, user_id, merged_user).await.unwrap()))
 }
 
 // Deletes a user
-pub async fn delete_user_handler(Path(id): Path<Uuid>, State(state): State<Arc<AppState>>) -> Json<Value>{
+pub async fn delete_user_handler(State(state): State<Arc<AppState>>, Path(id): Path<Uuid>, Extension(authed_user): Extension<AuthenticatedUser>) -> Json<Value>{
     let client = state.db_client.clone();
-    User::delete(&client, id).await.unwrap();
+    let user_id = Uuid::parse_str(&authed_user.user_id).unwrap();
+    User::delete(&client, user_id).await.unwrap();
     Json(json!({"message": "User deleted"}))
 }
 
