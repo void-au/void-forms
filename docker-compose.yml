@@ -1,0 +1,56 @@
+version: "3.9"
+
+services:
+  api:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: void_forms_api
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: development
+      LOG_LEVEL: INFO
+      SITES_CONFIG_PATH: config/sites.json
+      MONGODB_URL: mongodb://mongodb:27017
+      MONGODB_DATABASE: void_forms
+      MONGODB_COLLECTION: submissions
+      RATE_LIMIT_WINDOW_SECONDS: 60
+      RATE_LIMIT_MAX_REQUESTS: 10
+      RATE_LIMIT_REDIS_URL: redis://redis:6379/0
+      TURNSTILE_VERIFY_URL: https://challenges.cloudflare.com/turnstile/v0/siteverify
+      TURNSTILE_BYPASS: "false"
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_DEFAULT_CHAT_ID: ${TELEGRAM_DEFAULT_CHAT_ID:-}
+    volumes:
+      - ./config:/app/config:ro
+    depends_on:
+      - mongodb
+      - redis
+    restart: unless-stopped
+
+  mongodb:
+    profiles: ["app", "infra"]
+    image: mongo:7
+    container_name: void_forms_mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    restart: unless-stopped
+
+  redis:
+    profiles: ["app", "infra"]
+    image: redis:7-alpine
+    container_name: void_forms_redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6378:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  mongodb_data:
