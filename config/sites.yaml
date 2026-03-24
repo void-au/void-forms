@@ -1,29 +1,29 @@
 sites:
-  - site_id: demo-site
+  - site_id: void-labs
     allowed_attributes:
-      - first_name
-      - last_name
+      - name
       - company
       - message
       - email
-      - dropdown
+      - area-of-interest
     validation:
-      first_name:
-        max_length: 100
-      last_name:
+      name:
         max_length: 100
       company:
         max_length: 120
       message:
-        required: true
-        min_length: 5
+        required: false
         max_length: 2000
       email:
         required: true
         type: email
-      dropdown:
+      area-of-interest:
         options:
-          - sales
-          - support
+          - web
+          - ai
+          - architecture
+          - hardware
+          - mobile
+          - consulting
           - other
     turnstile_secret_env: TURNSTILE_SECRET_DEMO_SITE

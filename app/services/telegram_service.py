@@ -14,6 +14,14 @@ class TelegramNotifier:
         payload: dict[str, object],
         chat_id: str | None = None,
     ) -> tuple[bool, str | None]:
+        message = self._build_submission_message(site_id, payload)
+        return await self._send_message(message=message, chat_id=chat_id)
+
+    async def _send_message(
+        self,
+        message: str,
+        chat_id: str | None = None,
+    ) -> tuple[bool, str | None]:
         target_chat_id = chat_id or self.default_chat_id
         if not self.bot_token:
             return False, "telegram_not_configured"
@@ -21,7 +29,6 @@ class TelegramNotifier:
             return False, "telegram_chat_not_configured"
 
         url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
-        message = self._build_message(site_id, payload)
         body = {
             "chat_id": target_chat_id,
             "text": message,
@@ -39,7 +46,7 @@ class TelegramNotifier:
 
         return True, None
 
-    def _build_message(self, site_id: str, payload: dict[str, object]) -> str:
+    def _build_submission_message(self, site_id: str, payload: dict[str, object]) -> str:
         lines = [f"<b>New form submission</b>", f"<b>site_id:</b> {html.escape(site_id)}"]
         for key, value in payload.items():
             value_text = html.escape(str(value))

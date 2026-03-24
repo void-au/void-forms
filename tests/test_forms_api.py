@@ -42,8 +42,8 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setenv("MONGODB_URL", "mongodb://localhost:27017")
     monkeypatch.setenv("MONGODB_DATABASE", "void_forms_test")
     monkeypatch.setenv("MONGODB_COLLECTION", "submissions")
-    monkeypatch.setenv("RATE_LIMIT_WINDOW_SECONDS", "60")
-    monkeypatch.setenv("RATE_LIMIT_MAX_REQUESTS", "10")
+    monkeypatch.setenv("RATE_LIMIT_PER_MINUTE", "1")
+    monkeypatch.setenv("RATE_LIMIT_PER_HOUR", "3")
     monkeypatch.setenv("RATE_LIMIT_REDIS_URL", "redis://localhost:6379/15")
     monkeypatch.setenv("TURNSTILE_BYPASS", "true")
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "")
@@ -58,19 +58,22 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
 
 def _base_payload() -> dict:
     return {
-        "site_id": "demo-site",
-        "cloudflare_token": "dummy-token",
+        "site_id": "void-labs",
         "first_name": "Ada",
         "last_name": "Lovelace",
-        "company": "Analytical Engine",
         "message": "I want to know more about your API.",
         "email": "ada@example.com",
-        "dropdown": "sales",
+        "company": "Analytical Engine",
+        "area-of-interest": "web",
     }
 
 
+def _auth_headers(token: str = "dummy-token") -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
 def test_happy_path_submission(client: TestClient):
-    response = client.post("/v1/forms", json=_base_payload())
+    response = client.post("/v1/forms", json=_base_payload(), headers=_auth_headers())
 
     assert response.status_code == 200
     body = response.json()
@@ -82,7 +85,7 @@ def test_invalid_site_returns_404(client: TestClient):
     payload = _base_payload()
     payload["site_id"] = "unknown-site"
 
-    response = client.post("/v1/forms", json=payload)
+    response = client.post("/v1/forms", json=payload, headers=_auth_headers())
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "site_not_found"
@@ -90,9 +93,9 @@ def test_invalid_site_returns_404(client: TestClient):
 
 def test_disallowed_attributes_returns_422(client: TestClient):
     payload = _base_payload()
-    payload["custom_fields"] = {"unauthorized_field": "x"}
+    payload["unauthorized_field"] = "x"
 
-    response = client.post("/v1/forms", json=payload)
+    response = client.post("/v1/forms", json=payload, headers=_auth_headers())
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "validation_failed"
@@ -103,7 +106,7 @@ def test_turnstile_failure_returns_400(client: TestClient):
         return False, "invalid-input-response"
 
     client.app.state.turnstile_verifier.verify_token = failing_verify_token
-    response = client.post("/v1/forms", json=_base_payload())
+    response = client.post("/v1/forms", json=_base_payload(), headers=_auth_headers())
 
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "turnstile_failed"
@@ -115,8 +118,8 @@ def test_rate_limit_exceeded_returns_429(tmp_path: Path, monkeypatch: pytest.Mon
     monkeypatch.setenv("MONGODB_URL", "mongodb://localhost:27017")
     monkeypatch.setenv("MONGODB_DATABASE", "void_forms_test")
     monkeypatch.setenv("MONGODB_COLLECTION", "submissions")
-    monkeypatch.setenv("RATE_LIMIT_WINDOW_SECONDS", "60")
-    monkeypatch.setenv("RATE_LIMIT_MAX_REQUESTS", "1")
+    monkeypatch.setenv("RATE_LIMIT_PER_MINUTE", "1")
+    monkeypatch.setenv("RATE_LIMIT_PER_HOUR", "3")
     monkeypatch.setenv("RATE_LIMIT_REDIS_URL", "redis://localhost:6379/15")
     monkeypatch.setenv("TURNSTILE_BYPASS", "true")
 
@@ -124,8 +127,8 @@ def test_rate_limit_exceeded_returns_429(tmp_path: Path, monkeypatch: pytest.Mon
     with TestClient(app) as test_client:
         test_client.app.state.rate_limiter = OneShotRateLimiter()
         test_client.app.state.submission_store = InMemorySubmissionStore()
-        first = test_client.post("/v1/forms", json=_base_payload())
-        second = test_client.post("/v1/forms", json=_base_payload())
+        first = test_client.post("/v1/forms", json=_base_payload(), headers=_auth_headers())
+        second = test_client.post("/v1/forms", json=_base_payload(), headers=_auth_headers())
 
     assert first.status_code == 200
     assert second.status_code == 429
@@ -137,10 +140,61 @@ def test_telegram_failure_does_not_fail_submission(client: TestClient):
         return False, "telegram_http_error"
 
     client.app.state.telegram_notifier.send_notification = failing_send_notification
-    response = client.post("/v1/forms", json=_base_payload())
+    response = client.post("/v1/forms", json=_base_payload(), headers=_auth_headers())
 
     assert response.status_code == 200
     body = response.json()
     assert body["ok"] is True
     assert body["data"]["notification_sent"] is False
     assert body["data"]["warning"] == "telegram_http_error"
+
+
+def test_missing_authorization_header_returns_400(client: TestClient):
+    response = client.post("/v1/forms", json=_base_payload())
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+
+
+def test_invalid_authorization_header_returns_400(client: TestClient):
+    response = client.post(
+        "/v1/forms",
+        json=_base_payload(),
+        headers={"Authorization": "Token dummy-token"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+
+
+def test_missing_authorization_header_returns_400_when_dev_mode_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("SITES_CONFIG_PATH", "config/sites.yaml")
+    monkeypatch.setenv("TURNSTILE_SECRET_DEMO_SITE", "test-secret")
+    monkeypatch.setenv("MONGODB_URL", "mongodb://localhost:27017")
+    monkeypatch.setenv("MONGODB_DATABASE", "void_forms_test")
+    monkeypatch.setenv("MONGODB_COLLECTION", "submissions")
+    monkeypatch.setenv("RATE_LIMIT_PER_MINUTE", "1")
+    monkeypatch.setenv("RATE_LIMIT_PER_HOUR", "3")
+    monkeypatch.setenv("RATE_LIMIT_REDIS_URL", "redis://localhost:6379/15")
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("DEV_MODE", "false")
+    monkeypatch.setenv("TURNSTILE_BYPASS", "false")
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "")
+    monkeypatch.setenv("TELEGRAM_DEFAULT_CHAT_ID", "")
+
+    app = create_app()
+    with TestClient(app) as test_client:
+        test_client.app.state.rate_limiter = AllowAllRateLimiter()
+        test_client.app.state.submission_store = InMemorySubmissionStore()
+        response = test_client.post("/v1/forms", json=_base_payload())
+
+    assert response.status_code == 400
+    body = response.json()
+    assert body["error"]["code"] == "invalid_authorization_header"
+    assert body["error"]["details"] == [
+        {"field": "authorization", "message": "missing_or_invalid_bearer_token"}
+    ]

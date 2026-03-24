@@ -28,3 +28,11 @@ docker compose --profile app up -d --build
 
 That's it — edit `.env` to add your secrets (Turnstile, Telegram) before running.
 
+Form submissions must send the Cloudflare Turnstile token in the `Authorization` header as `Bearer <token>`, not in the JSON body.
+
+The request body only requires `site_id`. Any other submitted form fields are accepted dynamically at the top level and then validated against the matching site rules in `config/sites.yaml`.
+
+When `DEV_MODE=true` or `TURNSTILE_BYPASS=true`, the API accepts form submissions without an `Authorization` header so local and preview environments can work without a Turnstile token. In production, keep both disabled so the bearer token is required.
+
+Rate limiting is applied per `site_id` and client IP: by default the API allows 1 submission per minute and 3 submissions per hour.
+

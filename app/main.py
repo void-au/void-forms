@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.forms import router as forms_router
@@ -31,8 +32,8 @@ async def lifespan(app: FastAPI):
     app.state.site_registry = SiteRegistry.from_file(settings.sites_config_path)
     app.state.rate_limiter = RedisFixedWindowRateLimiter(
         redis_url=settings.rate_limit_redis_url,
-        max_requests=settings.rate_limit_max_requests,
-        window_seconds=settings.rate_limit_window_seconds,
+        per_minute_limit=settings.rate_limit_per_minute,
+        per_hour_limit=settings.rate_limit_per_hour,
     )
     app.state.turnstile_verifier = TurnstileVerifier(
         verify_url=settings.turnstile_verify_url,
@@ -55,6 +56,14 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Void Forms API", version="0.1.0", lifespan=lifespan)
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["x-request-id"],
+    )
 
     register_exception_handlers(app)
 

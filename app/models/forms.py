@@ -1,25 +1,15 @@
 from typing import Any
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict
 
 
 class FormSubmissionRequest(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     site_id: str
-    cloudflare_token: str
-    first_name: str | None = None
-    last_name: str | None = None
-    company: str | None = None
-    message: str | None = None
-    email: EmailStr | None = None
-    dropdown: str | None = None
-    custom_fields: dict[str, Any] = Field(default_factory=dict)
 
     def normalized_payload(self) -> dict[str, Any]:
-        standard_data = self.model_dump(
-            exclude_none=True,
-            exclude={"site_id", "cloudflare_token", "custom_fields"},
-        )
-        return {**standard_data, **self.custom_fields}
+        return self.model_dump(exclude_none=True, exclude={"site_id"})
 
 
 class ErrorBody(BaseModel):

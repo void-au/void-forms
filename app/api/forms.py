@@ -13,6 +13,31 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _extract_turnstile_token(request: Request, required: bool) -> str:
+    authorization = request.headers.get("authorization", "")
+    if not authorization.strip():
+        if required:
+            raise ApiError(
+                400,
+                "invalid_authorization_header",
+                "Authorization header must use Bearer token format",
+                details=[{"field": "authorization", "message": "missing_or_invalid_bearer_token"}],
+            )
+        return ""
+
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token.strip():
+        if not required:
+            return ""
+        raise ApiError(
+            400,
+            "invalid_authorization_header",
+            "Authorization header must use Bearer token format",
+            details=[{"field": "authorization", "message": "missing_or_invalid_bearer_token"}],
+        )
+    return token.strip()
+
+
 @router.post("/v1/forms", response_model=ApiResponse)
 async def submit_form(payload: FormSubmissionRequest, request: Request) -> dict:
     request_id = request.state.request_id
@@ -25,10 +50,14 @@ async def submit_form(payload: FormSubmissionRequest, request: Request) -> dict:
     turnstile_verifier = request.app.state.turnstile_verifier
     telegram_notifier = request.app.state.telegram_notifier
     submission_store = request.app.state.submission_store
+    settings = request.app.state.settings
 
     site = site_registry.get_site(payload.site_id)
     if site is None:
         raise ApiError(404, "site_not_found", "No site configuration found for site_id")
+
+    require_turnstile_token = not (settings.dev_mode or settings.turnstile_bypass)
+    turnstile_token = _extract_turnstile_token(request, required=require_turnstile_token)
 
     limiter_key = f"{payload.site_id}:{client_ip}"
     try:
@@ -41,7 +70,7 @@ async def submit_form(payload: FormSubmissionRequest, request: Request) -> dict:
 
     turnstile_ok, turnstile_error = await turnstile_verifier.verify_token(
         secret=site.turnstile_secret,
-        token=payload.cloudflare_token,
+        token=turnstile_token,
         remote_ip=client_ip,
     )
     if not turnstile_ok:
@@ -49,7 +78,7 @@ async def submit_form(payload: FormSubmissionRequest, request: Request) -> dict:
             400,
             "turnstile_failed",
             "Cloudflare Turnstile verification failed",
-            details=[{"field": "cloudflare_token", "message": turnstile_error or "invalid"}],
+            details=[{"field": "authorization", "message": turnstile_error or "invalid"}],
         )
 
     attributes = payload.normalized_payload()
