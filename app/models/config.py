@@ -14,7 +14,8 @@ class SiteConfig(BaseModel):
     site_id: str
     allowed_attributes: set[str]
     validation: dict[str, ValidationRule] = Field(default_factory=dict)
-    turnstile_secret: str
+    turnstile_secret: str | None = None
+    turnstile_secret_env: str | None = None
     telegram_chat_id: str | None = None
 
 

@@ -1,6 +1,8 @@
 import os
 from dataclasses import dataclass
 
+from dotenv import load_dotenv
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -20,10 +22,11 @@ class Settings:
 
     @classmethod
     def from_env(cls) -> "Settings":
+        load_dotenv()
         return cls(
             app_env=os.getenv("APP_ENV", "development"),
             log_level=os.getenv("LOG_LEVEL", "INFO"),
-            sites_config_path=os.getenv("SITES_CONFIG_PATH", "config/sites.json"),
+            sites_config_path=os.getenv("SITES_CONFIG_PATH", "config/sites.yaml"),
             mongodb_url=os.getenv("MONGODB_URL", "mongodb://localhost:27017"),
             mongodb_database=os.getenv("MONGODB_DATABASE", "void_forms"),
             mongodb_collection=os.getenv("MONGODB_COLLECTION", "submissions"),

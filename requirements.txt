@@ -1,8 +1,10 @@
 fastapi==0.115.12
 uvicorn==0.34.0
 httpx==0.28.1
-pydantic==2.10.6
+pydantic==2.12.5
 email-validator==2.2.0
 redis==5.2.1
 pymongo==4.10.1
 pytest==8.3.5
+PyYAML==6.0.2
+python-dotenv==1.0.1

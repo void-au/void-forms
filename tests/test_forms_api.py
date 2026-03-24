@@ -37,7 +37,8 @@ class InMemorySubmissionStore:
 
 @pytest.fixture
 def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
-    monkeypatch.setenv("SITES_CONFIG_PATH", "config/sites.json")
+    monkeypatch.setenv("SITES_CONFIG_PATH", "config/sites.yaml")
+    monkeypatch.setenv("TURNSTILE_SECRET_DEMO_SITE", "test-secret")
     monkeypatch.setenv("MONGODB_URL", "mongodb://localhost:27017")
     monkeypatch.setenv("MONGODB_DATABASE", "void_forms_test")
     monkeypatch.setenv("MONGODB_COLLECTION", "submissions")
@@ -109,7 +110,8 @@ def test_turnstile_failure_returns_400(client: TestClient):
 
 
 def test_rate_limit_exceeded_returns_429(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("SITES_CONFIG_PATH", "config/sites.json")
+    monkeypatch.setenv("SITES_CONFIG_PATH", "config/sites.yaml")
+    monkeypatch.setenv("TURNSTILE_SECRET_DEMO_SITE", "test-secret")
     monkeypatch.setenv("MONGODB_URL", "mongodb://localhost:27017")
     monkeypatch.setenv("MONGODB_DATABASE", "void_forms_test")
     monkeypatch.setenv("MONGODB_COLLECTION", "submissions")

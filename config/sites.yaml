@@ -1,0 +1,29 @@
+sites:
+  - site_id: demo-site
+    allowed_attributes:
+      - first_name
+      - last_name
+      - company
+      - message
+      - email
+      - dropdown
+    validation:
+      first_name:
+        max_length: 100
+      last_name:
+        max_length: 100
+      company:
+        max_length: 120
+      message:
+        required: true
+        min_length: 5
+        max_length: 2000
+      email:
+        required: true
+        type: email
+      dropdown:
+        options:
+          - sales
+          - support
+          - other
+    turnstile_secret_env: TURNSTILE_SECRET_DEMO_SITE

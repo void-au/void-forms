@@ -8,11 +8,11 @@ services:
       dockerfile: Dockerfile
     container_name: void_forms_api
     ports:
-      - "8000:8000"
+      - "${API_HOST_PORT:-8000}:8000"
     environment:
       APP_ENV: development
       LOG_LEVEL: INFO
-      SITES_CONFIG_PATH: config/sites.json
+      SITES_CONFIG_PATH: config/sites.yaml
       MONGODB_URL: mongodb://mongodb:27017
       MONGODB_DATABASE: void_forms
       MONGODB_COLLECTION: submissions
@@ -21,6 +21,7 @@ services:
       RATE_LIMIT_REDIS_URL: redis://redis:6379/0
       TURNSTILE_VERIFY_URL: https://challenges.cloudflare.com/turnstile/v0/siteverify
       TURNSTILE_BYPASS: "false"
+      TURNSTILE_SECRET_DEMO_SITE: ${TURNSTILE_SECRET_DEMO_SITE:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_DEFAULT_CHAT_ID: ${TELEGRAM_DEFAULT_CHAT_ID:-}
     volumes:
@@ -35,7 +36,7 @@ services:
     image: mongo:7
     container_name: void_forms_mongodb
     ports:
-      - "27017:27017"
+      - "${MONGODB_HOST_PORT:-27017}:27017"
     volumes:
       - mongodb_data:/data/db
     restart: unless-stopped
@@ -46,7 +47,7 @@ services:
     container_name: void_forms_redis
     command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "6378:6379"
+      - "${REDIS_HOST_PORT:-6378}:6379"
     volumes:
       - redis_data:/data
     restart: unless-stopped
