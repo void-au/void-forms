@@ -11,6 +11,11 @@ def _env_flag(name: str, default: bool) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _env_list(name: str) -> list[str]:
+    value = os.getenv(name, "")
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
 @dataclass(frozen=True)
 class Settings:
     app_env: str
@@ -27,6 +32,11 @@ class Settings:
     turnstile_bypass: bool
     telegram_bot_token: str
     telegram_default_chat_id: str
+    mailgun_api_key: str
+    mailgun_domain: str
+    mailgun_from_name: str
+    mailgun_from_email: str
+    mailgun_default_to_emails: list[str]
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -52,4 +62,9 @@ class Settings:
             turnstile_bypass=_env_flag("TURNSTILE_BYPASS", False),
             telegram_bot_token=os.getenv("TELEGRAM_BOT_TOKEN", ""),
             telegram_default_chat_id=os.getenv("TELEGRAM_DEFAULT_CHAT_ID", ""),
+            mailgun_api_key=os.getenv("MAILGUN_API_KEY", ""),
+            mailgun_domain=os.getenv("MAILGUN_DOMAIN", ""),
+            mailgun_from_name=os.getenv("MAILGUN_FROM_NAME", "Void Forms"),
+            mailgun_from_email=os.getenv("MAILGUN_FROM_EMAIL", ""),
+            mailgun_default_to_emails=_env_list("MAILGUN_DEFAULT_TO_EMAILS"),
         )

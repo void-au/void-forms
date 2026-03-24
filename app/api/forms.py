@@ -48,7 +48,7 @@ async def submit_form(payload: FormSubmissionRequest, request: Request) -> dict:
     site_registry = request.app.state.site_registry
     rate_limiter = request.app.state.rate_limiter
     turnstile_verifier = request.app.state.turnstile_verifier
-    telegram_notifier = request.app.state.telegram_notifier
+    notification_service = request.app.state.notification_service
     submission_store = request.app.state.submission_store
     settings = request.app.state.settings
 
@@ -100,10 +100,9 @@ async def submit_form(payload: FormSubmissionRequest, request: Request) -> dict:
     except SubmissionStoreUnavailable:
         raise ApiError(503, "submission_store_unavailable", "Submission store unavailable")
 
-    notification_sent, notification_error = await telegram_notifier.send_notification(
-        site_id=payload.site_id,
+    notification_sent, notification_error = await notification_service.send_submission_notification(
+        site=site,
         payload=attributes,
-        chat_id=site.telegram_chat_id,
     )
 
     logger.info(

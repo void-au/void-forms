@@ -36,3 +36,5 @@ When `DEV_MODE=true` or `TURNSTILE_BYPASS=true`, the API accepts form submission
 
 Rate limiting is applied per `site_id` and client IP: by default the API allows 1 submission per minute and 3 submissions per hour.
 
+Notifications are provider-based. Telegram is supported, and Mailgun is now supported as well. Mailgun can use `MAILGUN_DEFAULT_TO_EMAILS` from the environment or per-site `mailgun_to_emails` values in `config/sites.yaml`.
+

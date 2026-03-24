@@ -10,6 +10,8 @@ from app.api.forms import router as forms_router
 from app.core.errors import register_exception_handlers
 from app.core.settings import Settings
 from app.services.config_service import SiteRegistry
+from app.services.mailgun_service import MailgunNotifier
+from app.services.notification_service import NotificationService
 from app.services.rate_limiter import RedisFixedWindowRateLimiter
 from app.services.submission_store import SubmissionStore
 from app.services.telegram_service import TelegramNotifier
@@ -39,9 +41,20 @@ async def lifespan(app: FastAPI):
         verify_url=settings.turnstile_verify_url,
         bypass=settings.turnstile_bypass,
     )
-    app.state.telegram_notifier = TelegramNotifier(
-        bot_token=settings.telegram_bot_token,
-        default_chat_id=settings.telegram_default_chat_id,
+    app.state.notification_service = NotificationService(
+        providers=[
+            TelegramNotifier(
+                bot_token=settings.telegram_bot_token,
+                default_chat_id=settings.telegram_default_chat_id,
+            ),
+            MailgunNotifier(
+                api_key=settings.mailgun_api_key,
+                domain=settings.mailgun_domain,
+                from_name=settings.mailgun_from_name,
+                from_email=settings.mailgun_from_email,
+                default_to_emails=settings.mailgun_default_to_emails,
+            ),
+        ]
     )
     app.state.submission_store = SubmissionStore(
         mongodb_url=settings.mongodb_url,

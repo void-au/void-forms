@@ -35,6 +35,15 @@ class InMemorySubmissionStore:
         return f"sub_{self._count}"
 
 
+class StubNotificationService:
+    async def send_submission_notification(
+        self,
+        site,
+        payload: dict,
+    ) -> tuple[bool, str | None]:
+        return True, None
+
+
 @pytest.fixture
 def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setenv("SITES_CONFIG_PATH", "config/sites.yaml")
@@ -52,6 +61,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     app = create_app()
     with TestClient(app) as test_client:
         test_client.app.state.rate_limiter = AllowAllRateLimiter()
+        test_client.app.state.notification_service = StubNotificationService()
         test_client.app.state.submission_store = InMemorySubmissionStore()
         yield test_client
 
@@ -126,6 +136,7 @@ def test_rate_limit_exceeded_returns_429(tmp_path: Path, monkeypatch: pytest.Mon
     app = create_app()
     with TestClient(app) as test_client:
         test_client.app.state.rate_limiter = OneShotRateLimiter()
+        test_client.app.state.notification_service = StubNotificationService()
         test_client.app.state.submission_store = InMemorySubmissionStore()
         first = test_client.post("/v1/forms", json=_base_payload(), headers=_auth_headers())
         second = test_client.post("/v1/forms", json=_base_payload(), headers=_auth_headers())
@@ -136,10 +147,12 @@ def test_rate_limit_exceeded_returns_429(tmp_path: Path, monkeypatch: pytest.Mon
 
 
 def test_telegram_failure_does_not_fail_submission(client: TestClient):
-    async def failing_send_notification(site_id: str, payload: dict, chat_id: str | None = None):
+    async def failing_send_submission_notification(site, payload: dict):
         return False, "telegram_http_error"
 
-    client.app.state.telegram_notifier.send_notification = failing_send_notification
+    client.app.state.notification_service.send_submission_notification = (
+        failing_send_submission_notification
+    )
     response = client.post("/v1/forms", json=_base_payload(), headers=_auth_headers())
 
     assert response.status_code == 200
@@ -189,6 +202,7 @@ def test_missing_authorization_header_returns_400_when_dev_mode_disabled(
     app = create_app()
     with TestClient(app) as test_client:
         test_client.app.state.rate_limiter = AllowAllRateLimiter()
+        test_client.app.state.notification_service = StubNotificationService()
         test_client.app.state.submission_store = InMemorySubmissionStore()
         response = test_client.post("/v1/forms", json=_base_payload())
 

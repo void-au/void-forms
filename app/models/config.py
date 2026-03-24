@@ -17,6 +17,7 @@ class SiteConfig(BaseModel):
     turnstile_secret: str | None = None
     turnstile_secret_env: str | None = None
     telegram_chat_id: str | None = None
+    mailgun_to_emails: list[str] = Field(default_factory=list)
 
 
 class SitesConfig(BaseModel):

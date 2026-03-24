@@ -2,20 +2,21 @@ import html
 
 import httpx
 
+from app.models.config import SiteConfig
+
 
 class TelegramNotifier:
     def __init__(self, bot_token: str, default_chat_id: str = ""):
         self.bot_token = bot_token
         self.default_chat_id = default_chat_id
 
-    async def send_notification(
+    async def send_submission_notification(
         self,
-        site_id: str,
+        site: SiteConfig,
         payload: dict[str, object],
-        chat_id: str | None = None,
     ) -> tuple[bool, str | None]:
-        message = self._build_submission_message(site_id, payload)
-        return await self._send_message(message=message, chat_id=chat_id)
+        message = self._build_submission_message(site.site_id, payload)
+        return await self._send_message(message=message, chat_id=site.telegram_chat_id)
 
     async def _send_message(
         self,
