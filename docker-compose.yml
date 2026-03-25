@@ -50,11 +50,9 @@ services:
     profiles: ["app", "infra"]
     image: redis:7-alpine
     container_name: void_forms_redis
-    command: ["redis-server", "--appendonly", "yes"]
+    command: ["redis-server"]
     ports:
       - "${REDIS_HOST_PORT:-6378}:6379"
-    volumes:
-      - redis_data:/data
     restart: unless-stopped
 
 volumes:
