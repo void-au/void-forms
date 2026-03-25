@@ -56,7 +56,7 @@ async def submit_form(payload: FormSubmissionRequest, request: Request) -> dict:
     if site is None:
         raise ApiError(404, "site_not_found", "No site configuration found for site_id")
 
-    require_turnstile_token = not (settings.dev_mode or settings.turnstile_bypass)
+    require_turnstile_token = not settings.turnstile_bypass
     turnstile_token = _extract_turnstile_token(request, required=require_turnstile_token)
 
     limiter_key = f"{payload.site_id}:{client_ip}"

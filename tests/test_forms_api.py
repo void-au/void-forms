@@ -182,7 +182,7 @@ def test_invalid_authorization_header_returns_400(client: TestClient):
     assert body["ok"] is True
 
 
-def test_missing_authorization_header_returns_400_when_dev_mode_disabled(
+def test_missing_authorization_header_returns_400_when_turnstile_bypass_disabled(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.setenv("SITES_CONFIG_PATH", "config/sites.yaml")
@@ -194,7 +194,6 @@ def test_missing_authorization_header_returns_400_when_dev_mode_disabled(
     monkeypatch.setenv("RATE_LIMIT_PER_HOUR", "3")
     monkeypatch.setenv("RATE_LIMIT_REDIS_URL", "redis://localhost:6379/15")
     monkeypatch.setenv("APP_ENV", "production")
-    monkeypatch.setenv("DEV_MODE", "false")
     monkeypatch.setenv("TURNSTILE_BYPASS", "false")
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "")
     monkeypatch.setenv("TELEGRAM_DEFAULT_CHAT_ID", "")

@@ -19,7 +19,6 @@ def _env_list(name: str) -> list[str]:
 @dataclass(frozen=True)
 class Settings:
     app_env: str
-    dev_mode: bool
     log_level: str
     sites_config_path: str
     mongodb_url: str
@@ -44,7 +43,6 @@ class Settings:
         app_env = os.getenv("APP_ENV", "development")
         return cls(
             app_env=app_env,
-            dev_mode=_env_flag("DEV_MODE", app_env.lower() == "development"),
             log_level=os.getenv("LOG_LEVEL", "INFO"),
             sites_config_path=os.getenv("SITES_CONFIG_PATH", "config/sites.yaml"),
             mongodb_url=os.getenv("MONGODB_URL", "mongodb://localhost:27017"),

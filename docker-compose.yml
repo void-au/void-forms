@@ -20,7 +20,7 @@ services:
       RATE_LIMIT_PER_HOUR: 3
       RATE_LIMIT_REDIS_URL: redis://redis:6379/0
       TURNSTILE_VERIFY_URL: https://challenges.cloudflare.com/turnstile/v0/siteverify
-      TURNSTILE_BYPASS: "false"
+      TURNSTILE_BYPASS: "${TURNSTILE_BYPASS:-true}"
       TURNSTILE_SECRET_DEMO_SITE: ${TURNSTILE_SECRET_DEMO_SITE:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_DEFAULT_CHAT_ID: ${TELEGRAM_DEFAULT_CHAT_ID:-}
