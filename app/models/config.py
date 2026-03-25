@@ -13,6 +13,7 @@ class ValidationRule(BaseModel):
 class SiteConfig(BaseModel):
     site_id: str
     allowed_attributes: set[str]
+    allowed_origins: list[str] = Field(default_factory=list)
     validation: dict[str, ValidationRule] = Field(default_factory=dict)
     turnstile_secret: str | None = None
     turnstile_secret_env: str | None = None

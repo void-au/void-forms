@@ -3,7 +3,6 @@ from contextlib import asynccontextmanager
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.forms import router as forms_router
@@ -70,13 +69,25 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     app = FastAPI(title="Void Forms API", version="0.1.0", lifespan=lifespan)
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_methods=["*"],
-        allow_headers=["*"],
-        expose_headers=["x-request-id"],
-    )
+    @app.middleware("http")
+    async def cors_middleware(request: Request, call_next):
+        site_registry = app.state.site_registry
+        allowed_origins = set()
+        for site in site_registry._sites_by_id.values():
+            allowed_origins.update(site.allowed_origins)
+        
+        if not allowed_origins:
+            allowed_origins = {"*"}
+
+        origin = request.headers.get("origin")
+        if origin in allowed_origins or "*" in allowed_origins:
+            response = await call_next(request)
+            response.headers["Access-Control-Allow-Origin"] = origin or "*"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, x-request-id"
+            response.headers["Access-Control-Expose-Headers"] = "x-request-id"
+            return response
+        return await call_next(request)
 
     register_exception_handlers(app)
 

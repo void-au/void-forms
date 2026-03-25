@@ -1,5 +1,9 @@
 sites:
   - site_id: void-labs
+    allowed_origins:
+      - http://localhost:3000
+      - http://localhost:5173
+      - https://voidlabs.com.au
     allowed_attributes:
       - name
       - company
